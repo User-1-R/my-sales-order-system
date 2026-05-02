@@ -57,7 +57,7 @@
   </div>
 </div>
 
-<!-- STEP 1 -->
+<!-- STEP 1: Customer Info -->
 <div id="step1">
   <div class="card">
     <div class="form-group">
@@ -79,7 +79,7 @@
   <div class="footer-btn-container"><button class="btn-main" onclick="nextStep(2)">បន្តទៅជ្រើសរើសផលិតផល →</button></div>
 </div>
 
-<!-- STEP 2 -->
+<!-- STEP 2: Product Selection -->
 <div id="step2" style="display:none;">
   <div id="pList" class="card" style="padding:0; margin-bottom:230px;"></div>
   <div class="footer-btn-container">
@@ -96,7 +96,7 @@
   </div>
 </div>
 
-<!-- STEP 3 -->
+<!-- STEP 3: Success -->
 <div id="step3" style="display:none; text-align:center;">
   <div class="card">
     <div style="font-size: 60px; margin-bottom:10px;">✅</div>
@@ -104,14 +104,14 @@
   </div>
   <div class="footer-btn-container">
     <button class="btn-main" style="background:#e74c3c; margin-bottom:10px;" id="btnPDF" onclick="downloadPDF()">បើកវិក្កយបត្រ (PDF) 📄</button>
-    <button class="btn-main" style="background:#6c757d;" onclick="location.reload()">កម្មង់ថ្មី</button>
+    <button class="btn-main" style="background:#6c757d;" onclick="resetForm()">កម្មង់ថ្មី</button>
   </div>
 </div>
 
 <script>
-  // Link Web App ថ្មីរបស់អ្នក
+  // ចងចាំ៖ ប្តូរ URL នេះទៅជា Web App URL ដែលអ្នកបាន Deploy ក្នុង Google Apps Script
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxQJL8I2q5kSmLMF1hIpn62LTPg8zC7fKiCL-CZicq0OEZByvCeJs1yndoPSqNBjEskag/exec";
-  
+
   let products = [], cart = {}, savedId = "";
 
   function toggleDarkMode() {
@@ -120,7 +120,7 @@
   }
 
   function nextStep(step) {
-    if(!document.getElementById('sManager').value || !document.getElementById('cName').value) return alert('សូមបំពេញព័ត៌មានឱ្យគ្រប់');
+    if(!document.getElementById('sManager').value || !document.getElementById('cName').value) return alert('សូមបំពេញ Sales Manager និងឈ្មោះអតិថិជន');
     document.getElementById('step1').style.display='none';
     document.getElementById('step2').style.display='block';
     document.getElementById('backBtn').style.display='flex';
@@ -137,7 +137,7 @@
 
   function loadProducts() {
     document.getElementById('pList').innerHTML = "<p style='text-align:center; padding:30px;'>កំពុងទាញយកទិន្នន័យ...</p>";
-    fetch(WEB_APP_URL + "?action=getProducts")
+    fetch(`${WEB_APP_URL}?action=getProducts`)
       .then(res => res.json())
       .then(data => {
         products = data;
@@ -208,61 +208,58 @@
       discountPerc: document.getElementById('discountPercent').value 
     };
 
-    fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(data) })
-      .then(res => res.json())
-      .then(res => {
-        savedId = res.orderId;
-        document.getElementById('step2').style.display='none';
-        document.getElementById('step3').style.display='block';
-        document.getElementById('backBtn').style.display='none';
-        document.getElementById('step-c-3').classList.add('active');
-      })
-      .catch(err => {
-        alert("ការរក្សាទុកមានបញ្ហា");
-        btn.innerText = "រក្សាទុកការបញ្ជាទិញ 🛒";
-        btn.disabled = false;
-      });
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(res => {
+      savedId = res.orderId;
+      document.getElementById('step2').style.display='none';
+      document.getElementById('step3').style.display='block';
+      document.getElementById('backBtn').style.display='none';
+      document.getElementById('step-c-3').classList.add('active');
+    });
   }
 
   function downloadPDF() {
     const btn = document.getElementById('btnPDF');
-    const originalText = btn.innerText;
-    btn.innerText = "កំពុងបង្កើត PDF..."; btn.disabled = true;
+    btn.innerText = "កំពុងរៀបចំ PDF..."; btn.disabled = true;
 
     const data = { 
-      orderId: savedId, 
-      customer: { 
-        name: document.getElementById('cName').value, 
-        phone: document.getElementById('cPhone').value, 
-        manager: document.getElementById('sManager').value 
-      }, 
-      items: Object.values(cart), 
-      subtotal: document.getElementById('subTotalUI').innerText, 
-      discountPerc: document.getElementById('discountPercent').value 
+      action: "generatePDF",
+      data: {
+        orderId: savedId, 
+        customer: { 
+          name: document.getElementById('cName').value, 
+          phone: document.getElementById('cPhone').value, 
+          manager: document.getElementById('sManager').value 
+        }, 
+        items: Object.values(cart), 
+        subtotal: document.getElementById('subTotalUI').innerText, 
+        discountPerc: document.getElementById('discountPercent').value 
+      }
     };
 
-    fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify({ action: "generatePDF", data: data }) })
-      .then(res => res.json())
-      .then(res => {
-        // បម្លែង Base64 ទៅជា Blob ដើម្បីបើកក្នុង Tab ថ្មីភ្លាមៗ
-        const byteCharacters = atob(res.base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {type: 'application/pdf'});
-        const url = URL.createObjectURL(blob);
-        
-        window.open(url, '_blank'); // បើក PDF ភ្លាមៗ
-        btn.innerText = originalText;
-        btn.disabled = false;
-      })
-      .catch(err => {
-        alert("មិនអាចបង្កើត PDF បានទេ");
-        btn.innerText = originalText;
-        btn.disabled = false;
-      });
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(res => {
+      const byteCharacters = atob(res.base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {type: 'application/pdf'});
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      btn.innerText = "បើកវិក្កយបត្រ (PDF) 📄"; btn.disabled = false;
+    });
+  }
+
+  function resetForm() {
+    location.reload();
   }
 </script>
 </body>
