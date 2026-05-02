@@ -1,5 +1,5 @@
 function doGet() {
-  return HtmlService.createTemplateFromFile('Form')
+  return HtmlService.createTemplateFromFile('index')
       .evaluate()
       .setTitle('Sales Order System')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
