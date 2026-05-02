@@ -21,6 +21,10 @@
     .step-circle.active { background: var(--primary); }
     
     .card { background: var(--card-bg); border-radius: 12px; padding: 20px; margin: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 8px; color: var(--label); }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font-size: 16px; box-sizing: border-box; outline: none; }
+    
     .product-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); }
     .product-img { width: 65px; height: 65px; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid #eee; }
     .qty-input { width: 65px; text-align: center; border: 1px solid var(--primary); padding: 8px; border-radius: 6px; font-weight: bold; background: var(--bg); color: var(--primary); font-size: 16px; }
@@ -56,16 +60,17 @@
 <!-- STEP 1 -->
 <div id="step1">
   <div class="card">
-    <div style="margin-bottom:15px;">
-      <label style="font-weight:bold; font-size:14px;">Sales Manager</label>
-      <select id="sManager" style="width:100%; padding:12px; margin-top:8px; border-radius:8px; border:1px solid var(--border);">
+    <div class="form-group">
+      <label>Sales Manager</label>
+      <select id="sManager">
         <option value="" disabled selected>ជ្រើសរើស Sales Manager</option>
         <option value="Central (MT-SM-1)">Central (MT-SM-1)</option>
-        <option value="Central (MT-SM-2)">Central (MT-SM-2)</option>
         <option value="Central (GT-SM)">Central (GT-SM)</option>
+        <option value="North (GT-SM)">North (GT-SM)</option>
       </select>
     </div>
-    <input type="text" id="cName" placeholder="ឈ្មោះអតិថិជន *" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--border);">
+    <div class="form-group"><label>ឈ្មោះអតិថិជន *</label><input type="text" id="cName" placeholder="បញ្ចូលឈ្មោះអតិថិជន"></div>
+    <div class="form-group"><label>លេខទូរស័ព្ទ</label><input type="tel" id="cPhone" placeholder="012 345 678"></div>
   </div>
   <div class="footer-btn-container"><button class="btn-main" onclick="nextStep(2)">បន្តទៅជ្រើសរើសផលិតផល →</button></div>
 </div>
@@ -74,7 +79,14 @@
 <div id="step2" style="display:none;">
   <div id="pList" class="card" style="padding:0; margin-bottom:230px;"></div>
   <div class="footer-btn-container">
-    <div class="summary-row"><span>Subtotal: <span id="subTotalUI">$0.00</span></span><span>VAT (10%): <span id="vatUI">$0.00</span></span></div>
+    <div class="summary-row">
+      <span>Subtotal: <span id="subTotalUI">$0.00</span></span>
+      <span>VAT (10%): <span id="vatUI">$0.00</span></span>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <span style="font-size:14px; color:orange; font-weight:bold;">Discount (%):</span>
+      <input type="number" id="discountPercent" value="0" style="width:75px; text-align:center;" oninput="calculateTotal()">
+    </div>
     <div class="grand-total-row"><span>សរុបចុងក្រោយ:</span><span id="grandTotalUI">$0.00</span></div>
     <button class="btn-main" style="background:#28a745;" id="btnSave" onclick="saveOrder()">រក្សាទុកការបញ្ជាទិញ 🛒</button>
   </div>
@@ -83,14 +95,17 @@
 <!-- STEP 3 -->
 <div id="step3" style="display:none; text-align:center;">
   <div class="card"><h2>✅ រក្សាទុកជោគជ័យ!</h2></div>
-  <div class="footer-btn-container"><button class="btn-main" onclick="location.reload()">កម្មង់ថ្មី</button></div>
+  <div class="footer-btn-container">
+    <button class="btn-main" style="background:#e74c3c; margin-bottom:10px;" onclick="downloadPDF()">ទាញយក PDF 📄</button>
+    <button class="btn-main" style="background:#6c757d;" onclick="location.reload()">កម្មង់ថ្មី</button>
+  </div>
 </div>
 
 <script>
-  // ប្តូរ URL នេះឱ្យត្រូវនឹង Web App របស់អ្នក
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxQJL8I2q5kSmLMF1hIpn62LTPg8zC7fKiCL-CZicq0OEZByvCeJs1yndoPSqNBjEskag/exec";
+  // ប្តូរ URL នេះឱ្យត្រូវនឹង URL នៃ Google Apps Script របស់អ្នក
+  const WEB_APP_URL = "https://script.google.com/macros/s/ប្តូរ_ID_របស់អ្នក_នៅទីនេះ/exec";
   
-  let products = [], cart = {};
+  let products = [], cart = {}, savedOrderId = "";
 
   function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
@@ -126,20 +141,17 @@
   function renderProducts() {
     document.getElementById('pList').innerHTML = products.map((p, i) => {
       const currentQty = cart[p.code] ? cart[p.code].qty : "";
-      
-      // ការកែសម្រួលដើម្បីចាប់យក "Stock Curent" ឱ្យត្រឹមត្រូវ
-      let stockVal = parseInt(p.stock_curent) || 0; 
-      let stockStatus = stockVal <= 0 ? `<span class="stock-tag status-out">អស់ស្តុក (0)</span>` :
-                        stockVal <= 50 ? `<span class="stock-tag status-low">ស្តុកទាប (${stockVal})</span>` :
-                        `<span class="stock-tag status-ok">មានក្នុងស្តុក (${stockVal})</span>`;
+      let stockVal = parseInt(p.stock) || 0;
+      let statusClass = stockVal <= 0 ? 'status-out' : (stockVal <= 50 ? 'status-low' : 'status-ok');
+      let statusText = stockVal <= 0 ? 'Out Stock' : (stockVal <= 50 ? `Low Stock (${stockVal})` : `Available (${stockVal})`);
 
       return `
         <div class="product-item">
           <img src="${p.image || 'https://via.placeholder.com/60'}" class="product-img">
           <div style="flex:1; margin-left:12px;">
             <b style="font-size:13px; display:block;">[${p.code}] ${p.name}</b>
-            <span style="color:var(--primary); font-weight:bold;">$${parseFloat(p.price).toFixed(2)}</span>
-            <div style="margin-top:2px;">${stockStatus}</div>
+            <span style="color:var(--primary); font-weight:bold;">$${p.price.toFixed(2)}</span>
+            <div style="margin-top:2px;"><span class="stock-tag ${statusClass}">${statusText}</span></div>
           </div>
           <input type="number" class="qty-input" placeholder="0" value="${currentQty}" oninput="updateCart(${i}, this.value)">
         </div>`;
@@ -155,18 +167,56 @@
   function calculateTotal() {
     let sub = 0; 
     Object.values(cart).forEach(item => sub += item.price * item.qty);
+    let vat = sub * 0.1, disc = (sub + vat) * (parseFloat(document.getElementById('discountPercent').value || 0) / 100);
     document.getElementById('subTotalUI').innerText = "$" + sub.toFixed(2);
-    document.getElementById('vatUI').innerText = "$" + (sub * 0.1).toFixed(2);
-    document.getElementById('grandTotalUI').innerText = "$" + (sub * 1.1).toFixed(2);
+    document.getElementById('vatUI').innerText = "$" + vat.toFixed(2);
+    document.getElementById('grandTotalUI').innerText = "$" + (sub + vat - disc).toFixed(2);
   }
 
   function saveOrder() {
+    if(Object.keys(cart).length === 0) return alert('សូមជ្រើសរើសទំនិញ');
     const btn = document.getElementById('btnSave');
     btn.innerText = "កំពុងរក្សាទុក..."; btn.disabled = true;
-    fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify({ customer: { name: document.getElementById('cName').value }, items: Object.values(cart) }) })
-      .then(() => {
+
+    const payload = {
+      customer: {
+        manager: document.getElementById('sManager').value,
+        name: document.getElementById('cName').value,
+        phone: document.getElementById('cPhone').value
+      },
+      items: Object.values(cart),
+      discountPerc: document.getElementById('discountPercent').value
+    };
+
+    fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        savedOrderId = res.orderId;
         document.getElementById('step2').style.display='none';
         document.getElementById('step3').style.display='block';
+        document.getElementById('step-c-3').classList.add('active');
+      });
+  }
+
+  function downloadPDF() {
+    const data = {
+      action: "generatePDF",
+      data: {
+        orderId: savedOrderId,
+        customer: { name: document.getElementById('cName').value, phone: document.getElementById('cPhone').value },
+        items: Object.values(cart),
+        subtotal: document.getElementById('subTotalUI').innerText,
+        discountPerc: document.getElementById('discountPercent').value
+      }
+    };
+
+    fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(data) })
+      .then(res => res.json())
+      .then(res => {
+        const link = document.createElement('a');
+        link.href = "data:application/pdf;base64," + res.base64;
+        link.download = "Invoice_" + savedOrderId + ".pdf";
+        link.click();
       });
   }
 </script>
